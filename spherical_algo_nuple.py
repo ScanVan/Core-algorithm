@@ -1,6 +1,6 @@
 import numpy as np
 
-def pose_estimation(p3d_liste,error_max,iteration_max):
+def pose_estimation(p3d_liste,error_max):
     nb_sph=len(p3d_liste)
     nb_pts=len(p3d_liste[0])
     sv_u_liste=[]
@@ -9,7 +9,7 @@ def pose_estimation(p3d_liste,error_max,iteration_max):
     sv_e_old=0
     sv_e_norm=1
     count=0
-    while abs(sv_e_norm-sv_e_old)>error_max and count<iteration_max:
+    while abs(sv_e_norm-sv_e_old)>error_max:
         sv_e_old=sv_e_norm
         sv_r_liste,sv_t_liste=estimation_rot_trans(p3d_liste,sv_u_liste)
         sv_u_liste,sv_e_liste=estimation_rayons(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste)
@@ -78,7 +78,6 @@ def azims_determination(azim_liste,sv_r_liste,sv_t_liste):
     for i in range(nb_sph):
         for j in range(i):
             k=i-1-j
-            #azim_liste[i]=np.dot(sv_r_liste[k].transpose(),azim_liste[i]-sv_t_liste[k])
             azim_liste[i]=np.dot(sv_r_liste[k].transpose(),azim_liste[i])
     return azim_liste
 

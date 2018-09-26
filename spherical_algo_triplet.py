@@ -1,6 +1,6 @@
 import numpy as np
 
-def pose_estimation(p3d_1,p3d_2,p3d_3,error_max,iteration_max):
+def pose_estimation(p3d_1,p3d_2,p3d_3,error_max):
     if len(p3d_1)==len(p3d_2)==len(p3d_3):
         longueur=len(p3d_1)
     sv_u=np.ones(longueur)
@@ -9,7 +9,7 @@ def pose_estimation(p3d_1,p3d_2,p3d_3,error_max,iteration_max):
     sv_e_old=0
     sv_e=1
     count=0
-    while abs(sv_e-sv_e_old)>error_max and count<iteration_max:
+    while abs(sv_e-sv_e_old)>error_max:
         sv_e_old=sv_e
         sv_r,sv_t=estimation_rot_trans(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w)
         sv_u,sv_v,sv_w,sv_e=estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t)
