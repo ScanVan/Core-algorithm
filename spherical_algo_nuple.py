@@ -18,7 +18,7 @@ def pose_estimation(p3d_liste,error_max):
         for i in range(len(sv_t_liste)):
             sv_t_norm+=np.linalg.norm(sv_t_liste[i])
         sv_e_norm=len(sv_e_liste)*max(sv_e_liste)/sv_t_norm
-        print(count,sv_e_norm)
+        #print(count,sv_e_norm)
     sv_scene,positions=pose_scene(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste)
     return [positions,sv_scene]
 
@@ -106,6 +106,46 @@ def intersection(liste_p,liste_azim):
             rayons.append(+np.linalg.norm(inter_proj))
     return rayons
 
+def intersection_bis(liste_p,liste_azim):
+    nb_pts=len(liste_p)
+    sum_v=np.zeros((3,3))
+    sum_vp=np.zeros((3,1))
+    for i in range(nb_pts):
+        v11=1.0-liste_azim[i][0]**2
+        v22=1.0-liste_azim[i][1]**2
+        v33=1.0-liste_azim[i][2]**2
+        v12=-liste_azim[i][0]*liste_azim[i][1]
+        v13=-liste_azim[i][0]*liste_azim[i][2]
+        v23=-liste_azim[i][1]*liste_azim[i][2]
+        sum_v[0,0]+=v11
+        sum_v[0,1]+=v12
+        sum_v[0,2]+=v13
+        sum_v[1,0]+=v12
+        sum_v[1,1]+=v22
+        sum_v[1,2]+=v23
+        sum_v[2,0]+=v13
+        sum_v[2,1]+=v23
+        sum_v[2,2]+=v33
+        p1=liste_p[i][0]
+        p2=liste_p[i][1]
+        p3=liste_p[i][2]
+        sum_vp[0,0]+=p1*v11+p2*v12+p3*v13
+        sum_vp[1,0]+=p1*v12+p2*v22+p3*v23
+        sum_vp[2,0]+=p1*v13+p2*v23+p3*v33
+    inter=np.dot(np.linalg.inv(sum_v),sum_vp)
+    inter=np.squeeze(np.asarray(inter))
+    rayons=[]
+    for i in range(nb_pts):
+        centre=liste_p[i]
+        azim=liste_azim[i]
+        inter_proj=azim*np.dot(inter-centre,azim)/np.dot(azim,azim)
+        direction=np.dot(inter_proj,azim)
+        if direction<0:
+            rayons.append(-np.linalg.norm(inter_proj))
+        else:
+            rayons.append(+np.linalg.norm(inter_proj))
+    return rayons
+
 def estimation_rayons(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste):
     nb_sph=len(p3d_liste)
     nb_pts=len(p3d_liste[0])
@@ -119,7 +159,7 @@ def estimation_rayons(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste):
             azim_liste.append(p3d_liste[i][j])
         azim_liste=azims_determination(azim_liste,sv_r_liste,sv_t_liste)
         try:
-            rayons=intersection(center_liste,azim_liste)
+            rayons=intersection_bis(center_liste,azim_liste)
             for i in range(nb_sph):
                 sv_u_liste[i][j]=rayons[i]
         except:
@@ -144,7 +184,7 @@ def pose_scene(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste):
             azim_liste.append(p3d_liste[i][j])
         azim_liste=azims_determination(azim_liste,sv_r_liste,sv_t_liste)
         try:
-            rayons=intersection(center_liste,azim_liste)
+            rayons=intersection_bis(center_liste,azim_liste)
         except:
             rayons=[]
             for i in range(nb_sph):
