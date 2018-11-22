@@ -1,5 +1,25 @@
 import numpy as np
 
+def normalisation(sv_t_liste,sv_u_liste):
+    m=len(sv_u_liste)
+    n=len(sv_u_liste[0])
+    num=m*n
+    den=0.0
+    for i in range(m):
+        for j in range(n):
+            den+=sv_u_liste[i][j]
+    alpha=num/den
+    sv_t_liste_new=[]
+    for trans in sv_t_liste:
+        sv_t_liste_new.append(alpha*trans)
+    sv_u_liste_new=[]
+    for i in range(m):
+        temp=[]
+        for j in range(n):
+            temp.append(alpha*sv_u_liste[i][j])
+        sv_u_liste_new.append(temp)
+    return sv_t_liste_new,sv_u_liste_new
+
 def pose_estimation(p3d_liste,error_max):
     nb_sph=len(p3d_liste)
     nb_pts=len(p3d_liste[0])
@@ -13,14 +33,14 @@ def pose_estimation(p3d_liste,error_max):
         sv_e_old=sv_e_norm
         sv_r_liste,sv_t_liste=estimation_rot_trans(p3d_liste,sv_u_liste)
         sv_u_liste,sv_e_liste=estimation_rayons(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste)
+        #sv_t_liste,sv_u_liste=normalisation(sv_t_liste,sv_u_liste)
         count+=1
         sv_t_norm=0.0
         for i in range(len(sv_t_liste)):
             sv_t_norm+=np.linalg.norm(sv_t_liste[i])
         sv_e_norm=len(sv_e_liste)*max(sv_e_liste)/sv_t_norm
-        #print(count,sv_e_norm)
-    sv_scene,positions=pose_scene(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste)
-    return [positions,sv_scene]
+    positions,sv_scene=pose_scene(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste)
+    return [positions,sv_r_liste,sv_scene]
 
 def svd_rotation(v,u):
     vu=np.dot(v,u)
@@ -194,4 +214,4 @@ def pose_scene(p3d_liste,sv_u_liste,sv_r_liste,sv_t_liste):
             inter_liste.append(center_liste[i]+azim_liste[i]*rayons[i])
         inter=sum(inter_liste)/len(inter_liste)
         sv_scene.append(inter)
-    return [sv_scene,center_liste]
+    return [center_liste,sv_scene]
