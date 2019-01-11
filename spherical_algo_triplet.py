@@ -11,22 +11,30 @@ def filter_radius(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,n):
     sv_u_mean=np.mean(sv_u)
     sv_v_mean=np.mean(sv_v)
     sv_w_mean=np.mean(sv_w)
-    sd=np.std(sv_u+sv_v+sv_w)
+
+    sv_u_std = np.std(sv_u)
+    sv_v_std = np.std(sv_v)
+    sv_w_std = np.std(sv_w)
+
+    sv_u_range = sv_u_std * n
+    sv_v_range = sv_v_std * n
+    sv_w_range = sv_w_std * n
+
     for i in range(len(sv_u)):
-        x=0
-        if abs(sv_u[i]-sv_u_mean)>n*sd:
-            x=1
-        if abs(sv_v[i]-sv_v_mean)>n*sd:
-            x=1
-        if abs(sv_w[i]-sv_w_mean)>n*sd:
-            x=1
-        if x==0:
-            p3d_1_new.append(p3d_1[i])
-            p3d_2_new.append(p3d_2[i])
-            p3d_3_new.append(p3d_3[i])
-            sv_u_new.append(sv_u[i])
-            sv_v_new.append(sv_v[i])
-            sv_w_new.append(sv_w[i])
+
+        if ( abs( sv_u[i] - sv_u_mean ) < sv_u_range ):
+
+            if ( abs( sv_v[i] - sv_v_mean ) < sv_v_range ):
+
+                if ( abs( sv_w[i] - sv_w_mean ) < sv_w_range ):
+
+                    p3d_1_new.append(p3d_1[i])
+                    p3d_2_new.append(p3d_2[i])
+                    p3d_3_new.append(p3d_3[i])
+                    sv_u_new.append(sv_u[i])
+                    sv_v_new.append(sv_v[i])
+                    sv_w_new.append(sv_w[i])
+
     return p3d_1_new,p3d_2_new,p3d_3_new,sv_u_new,sv_v_new,sv_w_new
 
 def pose_estimation(p3d_1,p3d_2,p3d_3,error_max):
@@ -37,7 +45,7 @@ def pose_estimation(p3d_1,p3d_2,p3d_3,error_max):
     sv_w=np.ones(longueur)
     sv_e_old=0
     sv_e=1
-    count=0    
+    count=0
     while abs(sv_e-sv_e_old)>error_max:
         sv_e_old=sv_e
         sv_r,sv_t=estimation_rot_trans(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w)
@@ -190,7 +198,7 @@ def intersection(liste_p,liste_azim):
             rayons.append(+np.linalg.norm(inter_proj))
     return rayons
 
-def estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):    
+def estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):
     if len(p3d_1)==len(p3d_2)==len(p3d_3)==len(sv_u)==len(sv_v)==len(sv_w):
         longueur=len(p3d_1)
     sv_r_12=sv_r[0:3,0:3]
