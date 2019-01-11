@@ -1,27 +1,33 @@
-#  Scanvan
-#
-#      Vincent Buntinx - vbuntinx@shogaku.ch
-#      Copyright (c) 2016-2018 DHLAB, EPFL
-#
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-    #! \file   spherical_algo_triplet.py
-    #  \author Vincent Buntinx <vbuntinx@shogaku.ch>
-    #
-    #  Scanvan - https://github.com/ScanVan
-
 import numpy as np
+from plyfile import PlyData, PlyElement
+
+def filter_radius(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,n):
+    p3d_1_new=[]
+    p3d_2_new=[]
+    p3d_3_new=[]
+    sv_u_new=[]
+    sv_v_new=[]
+    sv_w_new=[]
+    sv_u_mean=np.mean(sv_u)
+    sv_v_mean=np.mean(sv_v)
+    sv_w_mean=np.mean(sv_w)
+    sd=np.std(sv_u+sv_v+sv_w)
+    for i in range(len(sv_u)):
+        x=0
+        if abs(sv_u[i]-sv_u_mean)>n*sd:
+            x=1
+        if abs(sv_v[i]-sv_v_mean)>n*sd:
+            x=1
+        if abs(sv_w[i]-sv_w_mean)>n*sd:
+            x=1
+        if x==0:
+            p3d_1_new.append(p3d_1[i])
+            p3d_2_new.append(p3d_2[i])
+            p3d_3_new.append(p3d_3[i])
+            sv_u_new.append(sv_u[i])
+            sv_v_new.append(sv_v[i])
+            sv_w_new.append(sv_w[i])
+    return p3d_1_new,p3d_2_new,p3d_3_new,sv_u_new,sv_v_new,sv_w_new
 
 def pose_estimation(p3d_1,p3d_2,p3d_3,error_max):
     if len(p3d_1)==len(p3d_2)==len(p3d_3):
@@ -31,19 +37,34 @@ def pose_estimation(p3d_1,p3d_2,p3d_3,error_max):
     sv_w=np.ones(longueur)
     sv_e_old=0
     sv_e=1
-    count=0
+    count=0    
     while abs(sv_e-sv_e_old)>error_max:
         sv_e_old=sv_e
         sv_r,sv_t=estimation_rot_trans(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w)
         sv_u,sv_v,sv_w,sv_e=estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t)
+        p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w=filter_radius(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,3)
         count+=1
         sv_t_12=sv_t[0,0:3]
         sv_t_23=sv_t[1,3:6]
         sv_t_31=sv_t[2,6:9]
         sv_e_norm=2.0*sv_e/(np.linalg.norm(sv_t_12)+np.linalg.norm(sv_t_23))
+        sv_r_12=sv_r[0:3,0:3]
+        sv_r_23=sv_r[3:6,3:6]
+        sv_r_31=sv_r[6:9,6:9]
+        for rotation_test in [sv_r_12,sv_r_23,sv_r_31]:
+            the_det=round(np.linalg.det(rotation_test),4)
+            if the_det!=1.0:
+                print('attention rotation de déterminant non unitaire => '+str(the_det))
+                print('-'*30)
         print(count,sv_e_norm)
+    print('translations')
+    print(sv_t_12)
+    print(sv_t_23)
+    print('rotations')
+    print(sv_r_12)
+    print(sv_r_23)
     sv_scene,positions=pose_scene(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t)
-    return [positions,sv_scene]
+    return [positions,sv_r,sv_scene]
 
 def svd_rotation(v,u):
     vu=np.dot(v,u)
@@ -121,6 +142,15 @@ def centers_determination(sv_r,sv_t):
     c1=np.zeros(3)
     c2=np.dot(sv_r_12.transpose(),-sv_t_12)
     c3=np.dot(sv_r_12.transpose(),-sv_t_12+np.dot(sv_r_23.transpose(),-sv_t_23))
+    c3bis=np.dot(sv_r_31,sv_t_31)
+    diff=c3-c3bis
+    diff_norm=np.linalg.norm(diff)
+    if diff_norm > 10**-3:
+        print('attention c3!=c3_bis')
+        print(str(c3)+' => c3')
+        print(str(c3bis)+' => c3bis')
+        print(str(diff)+' => diff')
+        print('-'*30)
     return c1,c2,c3
 
 def azims_determination(a1,a2,a3,sv_r,sv_t):
@@ -160,7 +190,7 @@ def intersection(liste_p,liste_azim):
             rayons.append(+np.linalg.norm(inter_proj))
     return rayons
 
-def estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):
+def estimation_rayons(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):    
     if len(p3d_1)==len(p3d_2)==len(p3d_3)==len(sv_u)==len(sv_v)==len(sv_w):
         longueur=len(p3d_1)
     sv_r_12=sv_r[0:3,0:3]
@@ -205,6 +235,7 @@ def pose_scene(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):
             rayons=intersection([c1,c2,c3],[a1,a2,a3])
         except:
             rayons=[sv_u[i],sv_v[i],sv_w[i]]
+            print("attention l'intersection "+str(i)+"n'a pas pu être calculé (parrallelisme)")
         sv_u_ind=rayons[0]
         sv_v_ind=rayons[1]
         sv_w_ind=rayons[2]
@@ -212,3 +243,72 @@ def pose_scene(p3d_1,p3d_2,p3d_3,sv_u,sv_v,sv_w,sv_r,sv_t):
         sv_scene.append(inter)
     positions=[c1,c2,c3]
     return [sv_scene,positions]
+
+def read_matches(nom_fichier):
+    fichier=open(nom_fichier,'r')
+    text=fichier.read()
+    fichier.close()
+    text=text.split('\n')
+    elements=[]
+    for line in text:
+        line_split=line.split(' ')
+        for elem in line_split:
+            if elem!='':
+                elements.append(float(elem))
+    nb_matches=int(len(elements)/3)
+    #print(len(elements)/3,nb_matches)
+    matches=[[],[],[]]
+    ind_1=0
+    ind_2=0
+    for i in range(len(elements)):
+        if ind_2==0:
+            matches[ind_1].append((elements[i],elements[i+1]))
+            ind_1=(ind_1+1)%3
+            ind_2=1
+        else:
+            ind_2=0
+    return matches
+
+def pix_to_sph(matches_px):
+    dim_x=6016
+    dim_y=3008
+    matches_sphere=[]
+    for i in range(len(matches_px)):
+        matches_temp=[]
+        for j in range(len(matches_px[i])):
+            x_px=matches_px[i][j][0]
+            y_px=matches_px[i][j][1]
+            theta=0.5*np.pi-np.pi*y_px/dim_y
+            phi=2*np.pi*x_px/dim_x
+            x=np.cos(theta)*np.cos(phi)
+            y=np.cos(theta)*np.sin(phi)
+            z=np.sin(theta)
+            matches_temp.append(np.array([x,y,z]))
+        matches_sphere.append(matches_temp)
+    return matches_sphere
+
+def normalize_points(points):
+    new_points=[]
+    somme=0.0
+    for point in points:
+        somme+=np.linalg.norm(point)
+    lamb=len(points)/somme
+    for point in points:
+        new_points.append(lamb*point)
+    return new_points
+
+def save_ply(scene,name):
+    scene_ply=[]
+    for elem in scene:
+        scene_ply.append(tuple(elem))
+    scene_ply=np.array(scene_ply,dtype=[('x','f4'),('y','f4'),('z','f4')])
+    el=PlyElement.describe(scene_ply,'vertex',comments=[name])
+    PlyData([el],text=True).write(name+'.ply')
+
+matches=read_matches('triplet_matches')
+spheres=pix_to_sph(matches)
+positions,rotations,scene=pose_estimation(spheres[0],spheres[1],spheres[2],10**-8)
+#positions=normalize_points(positions)
+#scene=normalize_points(scene)
+save_ply(positions,'positions_triplet_test')
+save_ply(scene,'scene_triplet_test')
